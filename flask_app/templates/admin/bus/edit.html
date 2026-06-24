@@ -1,0 +1,166 @@
+{% extends 'admin/base.html' %}
+
+{% block title %}Edit Bus Route - Admin - TicketHub{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">Edit Bus Route</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('admin_edit_bus_route', route_id=route.id) }}">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Origin</label>
+                                <input type="text" class="form-control" name="origin" value="{{ route.origin }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Destination</label>
+                                <input type="text" class="form-control" name="destination" value="{{ route.destination }}" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Assigned Operator</label>
+                                <select class="form-select" name="operator_id">
+                                    <option value="">Unassigned</option>
+                                    {% for operator in operators %}
+                                        <option value="{{ operator.id }}" {% if route.operator_id == operator.id %}selected{% endif %}>
+                                            {{ operator.name }} ({{ operator.email }})
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bus Number</label>
+                                <input type="text" class="form-control" name="bus_number" value="{{ route.bus_number or '' }}" placeholder="e.g., ABC-1234">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bus Type</label>
+                                <select class="form-select" name="bus_type">
+                                    <option value="">Select Type</option>
+                                    <option value="AC" {% if route.bus_type == 'AC' %}selected{% endif %}>AC</option>
+                                    <option value="Non-AC" {% if route.bus_type == 'Non-AC' %}selected{% endif %}>Non-AC</option>
+                                    <option value="Sleeper" {% if route.bus_type == 'Sleeper' %}selected{% endif %}>Sleeper</option>
+                                    <option value="Semi-Sleeper" {% if route.bus_type == 'Semi-Sleeper' %}selected{% endif %}>Semi-Sleeper</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Departure Time</label>
+                                <input type="time" class="form-control" id="departureTime" name="departure_time" value="{{ route.departure_time.strftime('%H:%M') }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Arrival Time</label>
+                                <input type="time" class="form-control" id="arrivalTime" name="arrival_time" value="{{ route.arrival_time.strftime('%H:%M') }}" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Duration</label>
+                                <input type="text" class="form-control" id="durationField" name="duration" value="{{ route.duration or format_route_duration(route.departure_time, route.arrival_time) or '' }}" placeholder="Calculated automatically" readonly>
+                                <div class="form-text">Calculated from departure and arrival time. Earlier arrival means next-day arrival.</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Price (₱)</label>
+                                <input type="number" class="form-control" name="price" value="{{ route.price }}" step="0.01" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Total Seats</label>
+                                <input type="number" class="form-control" name="total_seats" value="{{ route.total_seats }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Amenities</label>
+                                <input type="text" class="form-control" name="amenities" value="{{ route.amenities or '' }}" placeholder="e.g., WiFi, Charging, AC">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_active" id="isActive" {% if route.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="isActive">
+                                    Active
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Update Route</button>
+                            <a href="{{ url_for('admin_bus_routes') }}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        'use strict';
+
+        var departureInput = document.getElementById('departureTime');
+        var arrivalInput = document.getElementById('arrivalTime');
+        var durationInput = document.getElementById('durationField');
+
+        function parseTimeToMinutes(value) {
+            if (!value) return null;
+
+            var parts = String(value).split(':');
+            if (parts.length < 2) return null;
+
+            var hours = parseInt(parts[0], 10);
+            var minutes = parseInt(parts[1], 10);
+
+            if (isNaN(hours) || isNaN(minutes)) return null;
+            return (hours * 60) + minutes;
+        }
+
+        function updateDuration() {
+            var departureMinutes = parseTimeToMinutes(departureInput.value);
+            var arrivalMinutes = parseTimeToMinutes(arrivalInput.value);
+
+            if (departureMinutes === null || arrivalMinutes === null) {
+                durationInput.value = '';
+                return;
+            }
+
+            if (arrivalMinutes <= departureMinutes) {
+                arrivalMinutes += 24 * 60;
+            }
+
+            var totalMinutes = arrivalMinutes - departureMinutes;
+            var hours = Math.floor(totalMinutes / 60);
+            var minutes = totalMinutes % 60;
+            var parts = [];
+
+            if (hours) parts.push(hours + 'h');
+            if (minutes) parts.push(minutes + 'm');
+
+            durationInput.value = parts.length ? parts.join(' ') : '0m';
+        }
+
+        departureInput.addEventListener('input', updateDuration);
+        arrivalInput.addEventListener('input', updateDuration);
+        updateDuration();
+    }());
+</script>
+{% endblock %}

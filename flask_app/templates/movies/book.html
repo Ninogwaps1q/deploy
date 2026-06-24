@@ -1,0 +1,394 @@
+{% extends 'base.html' %}
+
+{% set total_seats = (seat_layout.total_seats|default(cinema_total_seats|default(showtime.cinema.total_seats|default(showtime.available_seats|default(0)))))|int %}
+{% set seats_remaining = (seats_remaining|default(total_seats))|int %}
+{% set price = (showtime.price|default(0)) %}
+
+{% block title %}Book Tickets - {{ showtime.movie.title }} - TicketHub{% endblock %}
+
+{% block content %}
+<section class="py-5" style="background: linear-gradient(135deg, var(--dark) 0%, var(--dark-lighter) 100%);">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-3">
+                <li class="breadcrumb-item"><a href="{{ url_for('movies') }}" class="text-white-50">Movies</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('movie_detail', movie_id=showtime.movie.id) }}" class="text-white-50">{{ showtime.movie.title }}</a></li>
+                <li class="breadcrumb-item active text-white">Book Tickets</li>
+            </ol>
+        </nav>
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+            <div>
+                <h1 class="text-white fw-bold mb-2">Select Your Seats</h1>
+                <p class="text-white-50 mb-0">{{ showtime.cinema.name }} • {{ seat_layout.style_label }}</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge rounded-pill bg-light text-dark border">{{ seat_layout.style_label }}</span>
+                {% if seat_layout.vip_rows > 0 %}
+                    <span class="badge rounded-pill bg-warning text-dark">VIP +&#8369;{{ "%.2f"|format(seat_layout.vip_surcharge) }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-body p-4 cinema-booking-card">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                            <div>
+                                <h5 class="fw-bold mb-1">Choose Your Seats</h5>
+                                <p class="text-muted mb-0">{{ seat_layout.description }}</p>
+                            </div>
+                            <div class="text-muted small">
+                                <i class="bi bi-info-circle me-1"></i>{{ seats_remaining }} seats available
+                            </div>
+                        </div>
+
+                        <div class="cinema-screen-wrap text-center mb-5">
+                            <div class="cinema-screen-label">{{ seat_layout.screen_label }}</div>
+                            <div class="cinema-screen-arc"></div>
+                        </div>
+
+                        <div class="cinema-seat-map seat-layout-{{ seat_layout.style }}" id="seatGrid">
+                            {% for row in seat_layout.rows %}
+                                {% if row.seat_count > 0 %}
+                                    <div class="cinema-seat-row {% if row.is_vip_row %}is-vip-row{% endif %}" style="--row-offset: {{ row.offset_units }}px;">
+                                        <div class="cinema-row-label">{{ row.row_label }}</div>
+                                        <div class="cinema-row-groups">
+                                            {% for group in row.groups %}
+                                                <div class="cinema-seat-group">
+                                                    {% for seat in group %}
+                                                        <button
+                                                            type="button"
+                                                            class="cinema-seat {% if seat.is_vip %}vip{% endif %}"
+                                                            data-seat="{{ seat.code }}"
+                                                            data-seat-label="{{ seat.display_label }}"
+                                                            data-seat-tier="{{ seat.tier }}"
+                                                            data-seat-price="{{ "%.2f"|format(seat.price) }}"
+                                                            aria-label="Seat {{ seat.display_label }}{% if seat.is_vip %} VIP{% endif %}"
+                                                        >
+                                                            <span class="cinema-seat-number">{{ seat.display_label }}</span>
+                                                            {% if seat.is_vip %}
+                                                                <span class="cinema-seat-tier">VIP</span>
+                                                            {% endif %}
+                                                        </button>
+                                                    {% endfor %}
+                                                </div>
+                                                {% if not loop.last %}
+                                                    <div class="cinema-seat-aisle" aria-hidden="true"></div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                        <div class="cinema-row-label cinema-row-label-end">{{ row.row_label }}</div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+
+                        <div class="cinema-seat-legend mt-4">
+                            <div class="legend-item">
+                                <span class="cinema-seat legend-seat" aria-hidden="true"></span>
+                                <span class="text-muted small">Available</span>
+                            </div>
+                            {% if seat_layout.vip_rows > 0 %}
+                                <div class="legend-item">
+                                    <span class="cinema-seat vip legend-seat" aria-hidden="true"></span>
+                                    <span class="text-muted small">VIP</span>
+                                </div>
+                            {% endif %}
+                            <div class="legend-item">
+                                <span class="cinema-seat selected legend-seat" aria-hidden="true"></span>
+                                <span class="text-muted small">Selected</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="cinema-seat booked legend-seat" aria-hidden="true"></span>
+                                <span class="text-muted small">Booked</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card sticky-top" style="top: 100px;">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-4">Booking Summary</h5>
+
+                        <div class="d-flex gap-3 mb-4">
+                            {% if showtime.movie.poster_image %}
+                                <img src="{{ url_for('static', filename='uploads/' + showtime.movie.poster_image) }}" class="rounded" style="width: 80px; height: 100px; object-fit: cover;" alt="Poster for {{ showtime.movie.title }}">
+                            {% else %}
+                                <div class="bg-secondary rounded d-flex align-items-center justify-content-center" style="width: 80px; height: 100px;">
+                                    <i class="bi bi-film text-white"></i>
+                                </div>
+                            {% endif %}
+                            <div>
+                                <h6 class="fw-bold mb-1">{{ showtime.movie.title }}</h6>
+                                <p class="text-muted small mb-1">{{ showtime.cinema.name }}</p>
+                                <p class="text-muted small mb-1">
+                                    {{ showtime.show_date.strftime('%b %d, %Y') }} | {{ showtime.show_time.strftime('%I:%M %p') }}
+                                </p>
+                                <span class="badge text-dark border bg-light">{{ seat_layout.style_label }}</span>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <form method="POST" action="{{ url_for('book_movie', showtime_id=showtime.id) }}" id="bookingForm">
+                            <input type="hidden" name="seat_numbers" id="selectedSeatsInput">
+
+                            <div class="mb-3">
+                                <label class="form-label">Number of Tickets</label>
+                                <select class="form-select" name="num_tickets" id="numTickets">
+                                    {% if seats_remaining > 0 %}
+                                        {% set max_tickets = seats_remaining %}
+                                        {% for i in range(1, max_tickets + 1) %}
+                                            <option value="{{ i }}">{{ i }} {% if i == 1 %}Ticket{% else %}Tickets{% endif %}</option>
+                                        {% endfor %}
+                                    {% else %}
+                                        <option value="0" selected disabled>Sold out</option>
+                                    {% endif %}
+                                </select>
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i> {{ seats_remaining }} seats available in {{ showtime.cinema.name }}
+                                </small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Selected Seats</label>
+                                <div class="form-control bg-light" id="selectedSeatsDisplay" style="min-height: 52px;">
+                                    <span class="text-muted">Click on seats to select</span>
+                                </div>
+                                <div id="validationError" class="invalid-feedback d-block mt-2" style="display: none; color: #dc3545;">
+                                    <i class="bi bi-exclamation-circle"></i> Please select <span id="requiredCount">1</span> seat(s) to match your ticket(s)
+                                </div>
+                            </div>
+
+                            <div class="cinema-pricing-note mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Cinema Design</span>
+                                    <span class="fw-semibold">{{ seat_layout.style_label }}</span>
+                                </div>
+                                {% if seat_layout.vip_rows > 0 %}
+                                    <div class="d-flex justify-content-between mt-2">
+                                        <span class="text-muted">VIP Add-on</span>
+                                        <span class="fw-semibold">+&#8369;{{ "%.2f"|format(seat_layout.vip_surcharge) }}</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <hr>
+
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Base ticket</span>
+                                <span>&#8369;{{ "%.2f"|format(price) }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Tickets</span>
+                                <span id="ticketCount">1</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Regular seats</span>
+                                <span id="regularSeatCount">0</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">VIP seats</span>
+                                <span id="vipSeatCount">0</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2" id="vipSummaryRow" style="display: none;">
+                                <span class="text-muted">VIP add-on total</span>
+                                <span id="vipSummaryValue">&#8369;0.00</span>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between mb-4">
+                                <span class="fw-bold">Total</span>
+                                <span class="fw-bold fs-5" style="color: var(--primary);" id="totalPrice">&#8369;{{ "%.2f"|format(price) }}</span>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 py-3" id="submitBtn" disabled>
+                                Proceed to Payment <i class="bi bi-arrow-right ms-2"></i>
+                            </button>
+                            <div id="submitError" class="alert alert-danger mt-2" role="alert" style="display: none;">
+                                <i class="bi bi-exclamation-triangle"></i> <span id="submitErrorText"></span>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    'use strict';
+
+    var basePrice = {{ price|float|tojson }};
+    var vipSurcharge = {{ seat_layout.vip_surcharge|float|tojson }};
+    var seatPriceMap = {{ seat_price_map|tojson }};
+    var vipSeatCodes = new Set({{ vip_seat_codes|tojson }});
+    var selectedSeats = [];
+    var bookedSeats = [];
+
+    function formatPeso(value) {
+        return '\u20B1' + Number(value || 0).toFixed(2);
+    }
+
+    function seatCodeToLabel(seatCode) {
+        var button = document.querySelector('.cinema-seat[data-seat="' + seatCode + '"]');
+        return button ? button.getAttribute('data-seat-label') : String(seatCode || '');
+    }
+
+    function validateSeats() {
+        var numTickets = parseInt(document.getElementById('numTickets').value, 10);
+        if (!numTickets || numTickets < 1) numTickets = 0;
+        var seatsSelected = selectedSeats.length;
+        var isValid = seatsSelected === numTickets && numTickets > 0;
+
+        document.getElementById('requiredCount').textContent = numTickets;
+        var validationError = document.getElementById('validationError');
+
+        if (numTickets === 0) {
+            validationError.style.display = 'none';
+        } else if (seatsSelected !== numTickets) {
+            validationError.style.display = 'block';
+        } else {
+            validationError.style.display = 'none';
+        }
+
+        document.getElementById('submitBtn').disabled = !isValid;
+        return isValid;
+    }
+
+    function updatePricingSummary() {
+        var vipCount = 0;
+        var numTickets = parseInt(document.getElementById('numTickets').value, 10) || 0;
+        var total = numTickets * basePrice;
+
+        selectedSeats.forEach(function (seatCode) {
+            if (vipSeatCodes.has(seatCode)) {
+                vipCount += 1;
+            }
+        });
+
+        var regularCount = selectedSeats.length - vipCount;
+        document.getElementById('regularSeatCount').textContent = regularCount;
+        document.getElementById('vipSeatCount').textContent = vipCount;
+        document.getElementById('ticketCount').textContent = numTickets;
+        document.getElementById('totalPrice').textContent = formatPeso(total + (vipCount * vipSurcharge));
+
+        var vipSummaryRow = document.getElementById('vipSummaryRow');
+        var vipSummaryValue = document.getElementById('vipSummaryValue');
+        if (vipCount > 0) {
+            vipSummaryRow.style.display = 'flex';
+            vipSummaryValue.textContent = formatPeso(vipCount * vipSurcharge);
+        } else {
+            vipSummaryRow.style.display = 'none';
+            vipSummaryValue.textContent = formatPeso(0);
+        }
+    }
+
+    function updateDisplay() {
+        var selectedDisplay = document.getElementById('selectedSeatsDisplay');
+
+        if (selectedSeats.length > 0) {
+            selectedDisplay.innerHTML = selectedSeats.map(function (seatCode) {
+                var isVip = vipSeatCodes.has(seatCode);
+                var badgeClass = isVip ? 'bg-warning text-dark' : 'bg-primary';
+                var suffix = isVip ? ' <span class="ms-1">VIP</span>' : '';
+                return '<span class="badge ' + badgeClass + ' me-1 mb-1">' + seatCodeToLabel(seatCode) + suffix + '</span>';
+            }).join('');
+        } else {
+            selectedDisplay.innerHTML = '<span class="text-muted">Click on seats to select</span>';
+        }
+
+        document.getElementById('selectedSeatsInput').value = selectedSeats.join(',');
+        updatePricingSummary();
+        validateSeats();
+    }
+
+    fetch('/get-booked-seats', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            showtime_id: {{ showtime.id|tojson }}
+        })
+    })
+    .then(function (response) { return response.json(); })
+    .then(function (data) {
+        if (data.booked_seats) {
+            data.booked_seats.forEach(function (seat) {
+                bookedSeats.push(seat);
+                var seatElement = document.querySelector('.cinema-seat[data-seat="' + seat + '"]');
+                if (seatElement) {
+                    seatElement.classList.add('booked');
+                    seatElement.disabled = true;
+                }
+            });
+        }
+    })
+    .catch(function (error) { console.error('Error fetching booked seats:', error); });
+
+    document.getElementById('bookingForm').addEventListener('submit', function (e) {
+        if (!validateSeats()) {
+            e.preventDefault();
+            var submitError = document.getElementById('submitError');
+            var submitErrorText = document.getElementById('submitErrorText');
+            var numTickets = parseInt(document.getElementById('numTickets').value, 10) || 0;
+
+            submitErrorText.textContent = 'Please select exactly ' + numTickets + ' seat(s) before proceeding. Currently selected: ' + selectedSeats.length;
+            submitError.style.display = 'block';
+            submitError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return false;
+        }
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('#seatGrid .cinema-seat'), function (seat) {
+        seat.addEventListener('click', function () {
+            if (this.classList.contains('booked')) {
+                alert('This seat is no longer available');
+                return;
+            }
+
+            var seatNum = this.getAttribute('data-seat');
+            var numTickets = parseInt(document.getElementById('numTickets').value, 10) || 0;
+
+            if (this.classList.contains('selected')) {
+                this.classList.remove('selected');
+                selectedSeats = selectedSeats.filter(function (value) { return value !== seatNum; });
+            } else if (selectedSeats.length < numTickets) {
+                this.classList.add('selected');
+                selectedSeats.push(seatNum);
+            } else {
+                alert('You can only select ' + numTickets + ' seats');
+            }
+
+            document.getElementById('submitError').style.display = 'none';
+            updateDisplay();
+        });
+    });
+
+    document.getElementById('numTickets').addEventListener('change', function () {
+        var numTickets = parseInt(this.value, 10) || 0;
+
+        while (selectedSeats.length > numTickets) {
+            var seatNum = selectedSeats.pop();
+            var seatEl = document.querySelector('.cinema-seat[data-seat="' + seatNum + '"]');
+            if (seatEl) {
+                seatEl.classList.remove('selected');
+            }
+        }
+
+        document.getElementById('submitError').style.display = 'none';
+        updateDisplay();
+    });
+
+    updateDisplay();
+</script>
+{% endblock %}
