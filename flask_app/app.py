@@ -16,7 +16,7 @@ import requests
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from flask_mail import Mail, Message
-from sqlalchemy import text
+from sqlalchemy import LargeBinary, text
 from sqlalchemy.exc import IntegrityError
 try:
     from status_utils import normalize_payment_status, payment_status_badge_class, payment_status_label
@@ -197,6 +197,17 @@ CINEMA_LAYOUT_PRESETS = {
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def save_uploaded_image(file, filename):
+    """Persist an uploaded image in the app database instead of function disk."""
+    record = UploadedImage.query.get(filename)
+    if record is None:
+        record = UploadedImage(filename=filename)
+        db.session.add(record)
+    record.data = file.read()
+    record.mimetype = file.mimetype or 'application/octet-stream'
+    return filename
 
 
 def paymongo_headers():
@@ -804,6 +815,14 @@ class User(UserMixin, db.Model):
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+
+class UploadedImage(db.Model):
+    """Image bytes stored in the configured database for serverless deployments."""
+    filename = db.Column(db.String(255), primary_key=True)
+    data = db.Column(LargeBinary, nullable=False)
+    mimetype = db.Column(db.String(100), nullable=False, default='application/octet-stream')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
 class Movie(db.Model):
@@ -2781,6 +2800,20 @@ def logout():
     logout_user()
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
+
+
+@app.route('/uploads/<path:filename>')
+def uploaded_image(filename):
+    filename = secure_filename(filename)
+    image = UploadedImage.query.get(filename)
+    if image is not None:
+        return send_file(io.BytesIO(image.data), mimetype=image.mimetype)
+
+    # Serve older local uploads while migrating them into database storage.
+    legacy_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.isfile(legacy_path):
+        return send_file(legacy_path)
+    return ('Image not found', 404)
 
 
 # ==================== ROUTES - MOVIES ====================
@@ -4929,8 +4962,7 @@ def admin_add_movie():
                 filename = secure_filename(file.filename)
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
                 filename = timestamp + filename
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                poster_image = filename
+                poster_image = save_uploaded_image(file, filename)
         
         movie = Movie(
             title=title,
@@ -4976,8 +5008,7 @@ def admin_edit_movie(movie_id):
                 filename = secure_filename(file.filename)
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
                 filename = timestamp + filename
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                movie.poster_image = filename
+                movie.poster_image = save_uploaded_image(file, filename)
         
         db.session.commit()
         flash('Movie updated successfully!', 'success')
@@ -5072,8 +5103,7 @@ def admin_add_cinema():
             file = request.files['image']
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                image_filename = filename
+                image_filename = save_uploaded_image(file, filename)
         
         cinema = Cinema(
             name=name,

@@ -8,7 +8,7 @@
         <div class="row g-5">
             <div class="col-md-4">
                 {% if movie.poster_image %}
-                    <img src="{{ url_for('static', filename='uploads/' + movie.poster_image) }}" class="img-fluid rounded-4 shadow-lg" alt="{{ movie.title }}">
+                    <img src="{{ url_for('uploaded_image', filename=movie.poster_image) }}" class="img-fluid rounded-4 shadow-lg" alt="{{ movie.title }}">
                 {% else %}
                     <div class="bg-secondary rounded-4 d-flex align-items-center justify-content-center" style="height: 400px;">
                         <i class="bi bi-film text-white" style="font-size: 5rem;"></i>

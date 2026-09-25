@@ -26,6 +26,6 @@ Set these when the matching features are used:
 - `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_DEFAULT_SENDER`
 - `GOOGLE_API_KEY`
 
-Uploads written by the app also need persistent object storage on Vercel. The function filesystem is temporary; uploaded files can disappear between invocations. Configure an external storage service before relying on user-uploaded images in production.
+Uploaded image files are stored in the configured database, not the Vercel function filesystem. Use hosted PostgreSQL for persistent images; storing image bytes in the database increases database storage usage.
 
-The import-time schema bootstrap creates missing tables and the configured role accounts. SQLite and uploads use temporary storage on Vercel, so a hosted database and external object storage are required for persistent production data and images. Admins must assign bus routes and cinemas to the respective operator accounts in the admin panel before those dashboards show assigned data.
+The import-time schema bootstrap creates missing tables and the configured role accounts. SQLite remains temporary on Vercel, so use hosted PostgreSQL for persistent records and uploaded images. Admins must assign bus routes and cinemas to the respective operator accounts in the admin panel before those dashboards show assigned data.

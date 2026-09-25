@@ -66,7 +66,7 @@
                             <label class="form-label fw-semibold">Poster Image</label>
                             {% if movie.poster_image %}
                                 <div class="mb-3">
-                                    <img src="{{ url_for('static', filename='uploads/' + movie.poster_image) }}" 
+                                    <img src="{{ url_for('uploaded_image', filename=movie.poster_image) }}" 
                                          class="rounded" style="max-height: 150px;">
                                     <p class="text-muted small mt-2 mb-0">Current poster</p>
                                 </div>
