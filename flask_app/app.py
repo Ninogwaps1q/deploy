@@ -48,9 +48,17 @@ database_url = os.environ.get('DATABASE_URL', 'sqlite:///ticketing.db')
 # Hosted PostgreSQL providers commonly supply the legacy postgres:// scheme.
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
+# Vercel's deployed application directory is read-only. SQLite is only a
+# temporary fallback there; use /tmp so the function can initialize at runtime.
+if os.environ.get('VERCEL') and database_url.startswith('sqlite:///'):
+    database_url = 'sqlite:////tmp/tickethub.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+default_upload_folder = (
+    '/tmp/tickethub-uploads' if os.environ.get('VERCEL')
+    else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+)
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', default_upload_folder)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # PayMongo configuration is read from environment via paymongo_headers()
