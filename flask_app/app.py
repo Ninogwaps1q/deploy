@@ -5485,10 +5485,27 @@ def reset_password(token):
 
 
 def bootstrap_db_schema():
-    """Ensure core tables/columns exist for import-based runs (e.g., flask run)."""
+    """Ensure core schema and explicitly configured first admin exist."""
     with app.app_context():
         db.create_all()
         ensure_booking_verification_columns()
+
+        admin_email = os.environ.get('ADMIN_EMAIL', '').strip().lower()
+        admin_password = os.environ.get('ADMIN_PASSWORD', '')
+        if admin_email and admin_password:
+            admin = User.query.filter_by(email=admin_email).first()
+            if admin is None:
+                admin = User(
+                    email=admin_email,
+                    name=os.environ.get('ADMIN_NAME', 'Administrator'),
+                    is_admin=True,
+                )
+                admin.set_password(admin_password)
+                db.session.add(admin)
+                db.session.commit()
+            elif not admin.is_admin:
+                admin.is_admin = True
+                db.session.commit()
 
 
 # Run lightweight schema bootstrap on import to avoid missing-column errors.
