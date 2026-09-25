@@ -2740,7 +2740,9 @@ def register():
 def login():
     if current_user.is_authenticated:
         # Redirect authenticated users based on their role
-        if current_user.is_bus_operator:
+        if current_user.is_admin:
+            return redirect(url_for('admin_dashboard'))
+        elif current_user.is_bus_operator:
             return redirect(url_for('bus_operator_dashboard'))
         elif current_user.is_cinema_operator:
             return redirect(url_for('cinema_operator_dashboard'))
@@ -2748,8 +2750,8 @@ def login():
             return redirect(url_for('index'))
     
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+        email = (request.form.get('email') or '').strip().lower()
+        password = request.form.get('password') or ''
         
         user = User.query.filter_by(email=email).first()
         
@@ -2759,7 +2761,9 @@ def login():
             flash('Welcome back!', 'success')
             
             # Redirect based on user role
-            if user.is_bus_operator:
+            if user.is_admin:
+                return redirect(next_page or url_for('admin_dashboard'))
+            elif user.is_bus_operator:
                 return redirect(next_page or url_for('bus_operator_dashboard'))
             elif user.is_cinema_operator:
                 return redirect(next_page or url_for('cinema_operator_dashboard'))
@@ -5491,7 +5495,7 @@ def bootstrap_db_schema():
         ensure_booking_verification_columns()
 
         admin_email = os.environ.get('ADMIN_EMAIL', '').strip().lower()
-        admin_password = os.environ.get('ADMIN_PASSWORD', '')
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'Adminqwe123')
         if admin_email and admin_password:
             admin = User.query.filter_by(email=admin_email).first()
             if admin is None:
