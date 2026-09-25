@@ -5489,27 +5489,39 @@ def reset_password(token):
 
 
 def bootstrap_db_schema():
-    """Ensure core schema and explicitly configured first admin exist."""
+    """Ensure the core schema and any environment-configured role accounts exist."""
     with app.app_context():
         db.create_all()
         ensure_booking_verification_columns()
+        role_accounts = (
+            ('ADMIN', 'is_admin', 'Administrator'),
+            ('BUS_OPERATOR', 'is_bus_operator', 'Bus Operator'),
+            ('CINEMA_OPERATOR', 'is_cinema_operator', 'Cinema Operator'),
+        )
+        changed = False
+        for prefix, role_flag, default_name in role_accounts:
+            email = os.environ.get(f'{prefix}_EMAIL', '').strip().lower()
+            password = os.environ.get(f'{prefix}_PASSWORD', '')
+            if not email or not password:
+                continue
 
-        admin_email = os.environ.get('ADMIN_EMAIL', '').strip().lower()
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'Adminqwe123')
-        if admin_email and admin_password:
-            admin = User.query.filter_by(email=admin_email).first()
-            if admin is None:
-                admin = User(
-                    email=admin_email,
-                    name=os.environ.get('ADMIN_NAME', 'Administrator'),
-                    is_admin=True,
+            user = User.query.filter_by(email=email).first()
+            if user is None:
+                user = User(
+                    email=email,
+                    name=os.environ.get(f'{prefix}_NAME', default_name),
                 )
-                admin.set_password(admin_password)
-                db.session.add(admin)
-                db.session.commit()
-            elif not admin.is_admin:
-                admin.is_admin = True
-                db.session.commit()
+                user.set_password(password)
+                db.session.add(user)
+                db.session.flush()
+                changed = True
+
+            if not getattr(user, role_flag):
+                setattr(user, role_flag, True)
+                changed = True
+
+        if changed:
+            db.session.commit()
 
 
 # Run lightweight schema bootstrap on import to avoid missing-column errors.
