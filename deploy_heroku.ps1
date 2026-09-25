@@ -67,8 +67,14 @@ if ($remotes -notmatch "heroku") {
 }
 
 # Push to heroku
-Write-Host "Pushing main branch to Heroku..."
-git push heroku main
+$currentBranch = git rev-parse --abbrev-ref HEAD
+if (-not $currentBranch) {
+    Write-Error "Unable to determine current git branch."
+    exit 1
+}
+
+Write-Host "Pushing branch $currentBranch to Heroku..."
+git push heroku "$currentBranch:main"
 
 # Set environment variables from .env (if exists) or .env.example
 $envFile = "./.env"

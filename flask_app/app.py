@@ -38,13 +38,17 @@ except ModuleNotFoundError:
     genai = None
 
 # Load environment variables from .env file.
-# override=True ensures local project .env is used even if stale shell env vars exist.
-load_dotenv(override=True)
+# Keep deployment-provided environment variables authoritative over local .env values.
+load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ticketing.db'
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///ticketing.db')
+# Hosted PostgreSQL providers commonly supply the legacy postgres:// scheme.
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -5315,6 +5319,10 @@ def chatbot_page():
 
 def run_schema_migrations():
     """Apply lightweight versioned migrations for existing SQLite databases."""
+    if db.engine.dialect.name != 'sqlite':
+        # These hand-written migrations use SQLite PRAGMA/ALTER syntax.
+        # SQLAlchemy create_all still creates new databases on other dialects.
+        return
     migration_steps = [
         (
             'booking_verification_columns',

@@ -96,6 +96,12 @@ heroku create your-app-name
 git push heroku main
 ```
 
+If your local branch is `master`, use:
+
+```bash
+git push heroku master:main
+```
+
 ## Step 5: Initialize Database
 
 Run migrations and create admin user on Heroku:
