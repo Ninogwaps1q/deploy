@@ -5412,7 +5412,7 @@ def init_db():
                 name='Administrator',
                 is_admin=True
             )
-            admin.set_password('admin123')
+            admin.set_password('Admin123!')
             db.session.add(admin)
         
         # Create sample cinema if not exists
